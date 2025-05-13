@@ -5,7 +5,7 @@ import (
 )
 
 func TestCleanInput(t *testing.T) {
-	// ...
+
 	// start by creating a slice of structs:
 
 	cases := []struct {
