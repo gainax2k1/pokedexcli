@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/gainax2k1/pokedexcli/internal/pokeapi"
+	_ "github.com/gainax2k1/pokedexcli/internal/pokecache"
 )
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(cfg *pokeapi.Config) error
 }
 
 // Declare the variable without initializing it
@@ -29,11 +32,34 @@ func init() {
 			description: "Displays a help message",
 			callback:    commandHelp,
 		},
+		"map": {
+			name:        "map",
+			description: "Displays names of locations, going forward a page", //my descript
+			callback:    commandListMap,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Displays names of locations, going back a page", // my descript
+			callback:    commandListMapBack,
+		},
 	}
 }
 
+/* ******************************************
+When you come back, you'll be focusing on:
+
+   1. Implementing the API request to fetch location areas
+   2. Parsing the JSON response
+   3. Updating the config with pagination URLs
+   4. Displaying the location names
+ ****************************************** */
+
 func main() {
 	//old for initial testing: fmt.Println("Hello, World!")
+
+	cfg := &pokeapi.Config{
+		PokeClient: pokeapi.NewClient(),
+	}
 
 	userInputScanner := bufio.NewScanner(os.Stdin) // correct?
 
@@ -49,7 +75,7 @@ func main() {
 			command := cleanedInput[0]
 
 			if cmd, exists := commandMap[command]; exists {
-				err := cmd.callback()
+				err := cmd.callback(cfg)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -57,11 +83,6 @@ func main() {
 				fmt.Println("Unknown command")
 			}
 		}
-		/* for testing input
-		        if len(cleanInput) > 0 {
-					fmt.Printf("Your command was: %s\n", cleanInput[0])
-				}
-		*/
 	}
 }
 
@@ -74,13 +95,13 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit() error { // for immmediately quitting the program
+func commandExit(cfg *pokeapi.Config) error { // for immmediately quitting the program
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp() error { //for printing help text
+func commandHelp(cfg *pokeapi.Config) error { //for printing help text
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
 	fmt.Println()
@@ -91,4 +112,49 @@ func commandHelp() error { //for printing help text
 	}
 
 	return nil
+}
+
+func commandListMap(cfg *pokeapi.Config) error {
+
+	// Call the API using the client
+	locationAreaPage, err := cfg.PokeClient.ListLocationAreas(cfg.NextURL)
+	if err != nil {
+		return err
+	}
+
+	// Update the config with the new URLs
+	cfg.NextURL = locationAreaPage.NextURL
+	cfg.PrevURL = locationAreaPage.PrevURL
+
+	// Print the location names
+	for _, location := range locationAreaPage.Names {
+		fmt.Println(location)
+	}
+
+	return nil
+}
+
+func commandListMapBack(cfg *pokeapi.Config) error {
+	if cfg.PrevURL == "" {
+		fmt.Println("you're on the first page")
+		return nil
+	}
+
+	// Call the API using the client
+	locationAreaPage, err := cfg.PokeClient.ListLocationAreas(cfg.PrevURL)
+	if err != nil {
+		return err
+	}
+
+	// Update the config with the new URLs
+	cfg.NextURL = locationAreaPage.NextURL
+	cfg.PrevURL = locationAreaPage.PrevURL
+
+	// Print the location names
+	for _, location := range locationAreaPage.Names {
+		fmt.Println(location)
+	}
+
+	return nil
+
 }
