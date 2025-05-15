@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gainax2k1/pokedexcli/internal/pokeapi"
 	_ "github.com/gainax2k1/pokedexcli/internal/pokecache"
@@ -48,17 +49,14 @@ func init() {
 /* ******************************************
 When you come back, you'll be focusing on:
 
-   1. Implementing the API request to fetch location areas
-   2. Parsing the JSON response
-   3. Updating the config with pagination URLs
-   4. Displaying the location names
+   1. cache
  ****************************************** */
 
 func main() {
 	//old for initial testing: fmt.Println("Hello, World!")
 
 	cfg := &pokeapi.Config{
-		PokeClient: pokeapi.NewClient(),
+		PokeClient: pokeapi.NewClient(5 * time.Minute),
 	}
 
 	userInputScanner := bufio.NewScanner(os.Stdin) // correct?

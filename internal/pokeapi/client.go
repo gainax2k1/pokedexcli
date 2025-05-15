@@ -3,9 +3,12 @@ package pokeapi
 import (
 	"encoding/json"
 	_ "errors"
-	_ "io" // don't need?
-	"log"
+	"fmt"
+	"io"
 	"net/http"
+	"time"
+
+	"github.com/gainax2k1/pokedexcli/internal/pokecache"
 )
 
 type Config struct {
@@ -32,12 +35,15 @@ type locationSummary struct {
 }
 
 type Client struct {
+	cache      *pokecache.Cache // for time caching
 	httpClient http.Client
 }
 
-func NewClient() *Client {
+func NewClient(cacheInterval time.Duration) *Client {
 	return &Client{
 		//initialize data
+
+		cache:      pokecache.NewCache(cacheInterval),
 		httpClient: http.Client{},
 	}
 }
@@ -49,17 +55,46 @@ func (c *Client) ListLocationAreas(url string) (LocationAreaPage, error) {
 	}
 
 	returnData := LocationAreaPage{}
+	// First check if we have this URL in the cache
+	var body []byte
+	var err error
 
+	cachedData, found := c.cache.Get(url)
+	if found {
+		// Use the cached data
+		fmt.Println("Cache hit!") // Optional logging
+		body = cachedData
+	} else {
+		// Cache miss - make the HTTP request
+		fmt.Println("Cache miss! Fetching from API...") // Optional logging
+
+		res, err := http.Get(url)
+		if err != nil {
+			return LocationAreaPage{}, err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode > 299 {
+			return LocationAreaPage{}, fmt.Errorf("response failed with status code: %d", res.StatusCode)
+		}
+
+		// Read the response body
+		body, err = io.ReadAll(res.Body)
+		if err != nil {
+			return LocationAreaPage{}, err
+		}
+
+		// Add to cache
+		c.cache.Add(url, body)
+	}
+
+	/* before caching implemented
 	// Make HTTP request to the URL
 
 	res, err := http.Get(url)
 	if err != nil {
 		return LocationAreaPage{}, err
 	}
-	/*
-		//set req headers?
-		body, err := io.ReadAll(res.Body)
-	*/
 
 	defer res.Body.Close() // do i need to defer?
 
@@ -70,15 +105,24 @@ func (c *Client) ListLocationAreas(url string) (LocationAreaPage, error) {
 	if err != nil {
 		return LocationAreaPage{}, err
 	}
+	*/
 
 	// Parse the response
 
 	var pokeapi PokeAPI // LocationAreaPage?
-	decoder := json.NewDecoder(res.Body)
-	err = decoder.Decode(&pokeapi) // not sure if correct
+
+	err = json.Unmarshal(body, &pokeapi)
 	if err != nil {
 		return LocationAreaPage{}, err
 	}
+
+	/*
+
+		decoder := json.NewDecoder(res.Body)
+		err = decoder.Decode(&pokeapi) // not sure if correct
+		if err != nil {
+			return LocationAreaPage{}, err
+		} */
 
 	// Return the data and update Config // actuall, DON'T update config, but returning values for caller to update.
 	returnData.PrevURL = pokeapi.Previous
