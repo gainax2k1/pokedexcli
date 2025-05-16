@@ -14,7 +14,7 @@ import (
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(cfg *pokeapi.Config) error
+	callback    func(cfg *pokeapi.Config, arg []string) error
 }
 
 // Declare the variable without initializing it
@@ -42,6 +42,11 @@ func init() {
 			name:        "mapb",
 			description: "Displays names of locations, going back a page", // my descript
 			callback:    commandListMapBack,
+		},
+		"explore": {
+			name:        "explore",
+			description: "Displays list of pokeman from the specified location", // my descript
+			callback:    commandExplore,
 		},
 	}
 }
@@ -71,9 +76,13 @@ func main() {
 		if len(cleanedInput) > 0 {
 
 			command := cleanedInput[0]
+			argument := []string{}
+			if len(cleanedInput) > 1 {
+				argument = cleanedInput[1:]
+			}
 
 			if cmd, exists := commandMap[command]; exists {
-				err := cmd.callback(cfg)
+				err := cmd.callback(cfg, argument)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -93,13 +102,13 @@ func cleanInput(text string) []string {
 	return words
 }
 
-func commandExit(cfg *pokeapi.Config) error { // for immmediately quitting the program
+func commandExit(cfg *pokeapi.Config, _ []string) error { // for immmediately quitting the program
 	fmt.Println("Closing the Pokedex... Goodbye!")
 	os.Exit(0)
 	return nil
 }
 
-func commandHelp(cfg *pokeapi.Config) error { //for printing help text
+func commandHelp(cfg *pokeapi.Config, _ []string) error { //for printing help text
 	fmt.Println("Welcome to the Pokedex!")
 	fmt.Println("Usage:")
 	fmt.Println()
@@ -112,7 +121,7 @@ func commandHelp(cfg *pokeapi.Config) error { //for printing help text
 	return nil
 }
 
-func commandListMap(cfg *pokeapi.Config) error {
+func commandListMap(cfg *pokeapi.Config, _ []string) error {
 
 	// Call the API using the client
 	locationAreaPage, err := cfg.PokeClient.ListLocationAreas(cfg.NextURL)
@@ -132,7 +141,7 @@ func commandListMap(cfg *pokeapi.Config) error {
 	return nil
 }
 
-func commandListMapBack(cfg *pokeapi.Config) error {
+func commandListMapBack(cfg *pokeapi.Config, _ []string) error {
 	if cfg.PrevURL == "" {
 		fmt.Println("you're on the first page")
 		return nil
@@ -153,6 +162,28 @@ func commandListMapBack(cfg *pokeapi.Config) error {
 		fmt.Println(location)
 	}
 
+	return nil
+
+}
+
+func commandExplore(cfg *pokeapi.Config, arg []string) error {
+	// in case no city is specified for exploring
+	if len(arg) == 0 {
+		fmt.Println("No city specified for exploring.")
+		fmt.Println("Command should be in format 'explore city-name'")
+		return nil
+	}
+	fmt.Printf("Exploring %s...\n", arg[0])
+	fmt.Println("Found Pokemon:")
+	// Call the API using the client
+	pokeList, err := cfg.PokeClient.ListPokemon(arg)
+	if err != nil {
+		return err
+	}
+
+	for _, pokemon := range pokeList {
+		fmt.Printf(" - %s\n", pokemon.Name)
+	}
 	return nil
 
 }

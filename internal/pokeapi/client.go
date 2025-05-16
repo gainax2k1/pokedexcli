@@ -34,6 +34,17 @@ type locationSummary struct {
 	Name string `json:"name"`
 }
 
+type PokeEncounters struct { //top level
+	Encounters []PokeList `json:"pokemon_encounters"`
+}
+type PokeList struct { // mid level
+	Pokemon pokemonName `json:"pokemon"`
+}
+
+type pokemonName struct { //base level
+	Name string `json:"name"` //// resume here! ************
+}
+
 type Client struct {
 	cache      *pokecache.Cache // for time caching
 	httpClient http.Client
@@ -88,25 +99,6 @@ func (c *Client) ListLocationAreas(url string) (LocationAreaPage, error) {
 		c.cache.Add(url, body)
 	}
 
-	/* before caching implemented
-	// Make HTTP request to the URL
-
-	res, err := http.Get(url)
-	if err != nil {
-		return LocationAreaPage{}, err
-	}
-
-	defer res.Body.Close() // do i need to defer?
-
-	if res.StatusCode > 299 {
-		log.Fatalf("Response failed with status code: %d", res.StatusCode)
-	}
-
-	if err != nil {
-		return LocationAreaPage{}, err
-	}
-	*/
-
 	// Parse the response
 
 	var pokeapi PokeAPI // LocationAreaPage?
@@ -115,14 +107,6 @@ func (c *Client) ListLocationAreas(url string) (LocationAreaPage, error) {
 	if err != nil {
 		return LocationAreaPage{}, err
 	}
-
-	/*
-
-		decoder := json.NewDecoder(res.Body)
-		err = decoder.Decode(&pokeapi) // not sure if correct
-		if err != nil {
-			return LocationAreaPage{}, err
-		} */
 
 	// Return the data and update Config // actuall, DON'T update config, but returning values for caller to update.
 	returnData.PrevURL = pokeapi.Previous
@@ -134,5 +118,68 @@ func (c *Client) ListLocationAreas(url string) (LocationAreaPage, error) {
 
 	// update config...?
 	return returnData, nil
+
+}
+
+func (c *Client) ListPokemon(arg []string) ([]pokemonName, error) {
+	pokeList := []pokemonName{}
+
+	// insert stuff here!
+
+	url := "https://pokeapi.co/api/v2/location-area/" + arg[0] //append city name to url
+
+	// First check if we have this URL in the cache
+	var body []byte
+	var err error
+
+	cachedData, found := c.cache.Get(url)
+	if found {
+		// Use the cached data
+		fmt.Println("Cache hit!") // Optional logging
+		body = cachedData
+	} else {
+		// Cache miss - make the HTTP request
+		fmt.Println("Cache miss! Fetching from API...") // Optional logging
+
+		res, err := http.Get(url)
+		if err != nil {
+			return []pokemonName{}, err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode > 299 {
+			return []pokemonName{}, fmt.Errorf("response failed with status code: %d", res.StatusCode)
+		}
+
+		// Read the response body
+		body, err = io.ReadAll(res.Body)
+		if err != nil {
+			return []pokemonName{}, err
+		}
+
+		// Add to cache
+		c.cache.Add(url, body)
+	}
+
+	// Parse the response
+
+	//var pokeapi PokeAPI // LocationAreaPage?
+	var enounters PokeEncounters
+
+	err = json.Unmarshal(body, &enounters)
+	if err != nil {
+		return []pokemonName{}, err
+	}
+
+	// (copied from above) Return the data and update Config // actuall, DON'T update config, but returning values for caller to update.
+	//returnData.PrevURL = pokeapi.Previous
+	//returnData.NextURL = pokeapi.Next
+
+	for _, pList := range enounters.Encounters {
+		pokeList = append(pokeList, pList.Pokemon) // not loc.name, but pokemon name.
+	}
+
+	// update config...?
+	return pokeList, nil
 
 }
