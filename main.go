@@ -20,6 +20,13 @@ type cliCommand struct {
 // Declare the variable without initializing it
 var commandMap map[string]cliCommand
 
+/*
+type Pokemon struct {
+	name string
+}*/
+
+var pokedex = map[string]pokeapi.PokemonInfo{} // to store all the users caught pokemon
+
 // Init function runs after variable declaration but before main
 func init() {
 	commandMap = map[string]cliCommand{
@@ -48,14 +55,23 @@ func init() {
 			description: "Displays list of pokeman from the specified location", // my descript
 			callback:    commandExplore,
 		},
+		"catch": {
+			name:        "catch",
+			description: "Attempt to catch specified pokemon", // my descript
+			callback:    commandCatch,
+		},
+		"inspect": {
+			name:        "inspect",
+			description: "Inspect a specified pokemon if already caught", // my descript
+			callback:    commandInspect,
+		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "List all caught pokemon", // my descript
+			callback:    commandPokedex,
+		},
 	}
 }
-
-/* ******************************************
-When you come back, you'll be focusing on:
-
-   1. cache
- ****************************************** */
 
 func main() {
 	//old for initial testing: fmt.Println("Hello, World!")
@@ -186,4 +202,72 @@ func commandExplore(cfg *pokeapi.Config, arg []string) error {
 	}
 	return nil
 
+}
+
+func commandCatch(cfg *pokeapi.Config, arg []string) error {
+	// in case no pokemons specified for attempt to catch
+	if len(arg) == 0 {
+		fmt.Println("No pokemon specified for catching.")
+		fmt.Println("Command should be in format 'catch pokemon-name'")
+		return nil
+	}
+	fmt.Printf("Throwing a Pokeball at %s...\n", arg[0])
+
+	// insert catching logic here
+	succesfulCatch, pokeInfo, err := cfg.PokeClient.CatchPokemon(arg)
+	if err != nil {
+		return err
+	}
+
+	if succesfulCatch {
+		fmt.Printf("%s was caught!\n", arg[0])
+		fmt.Println("You may now inspect it with the inspect command.")
+		pokedex[arg[0]] = pokeInfo
+
+	} else {
+		fmt.Printf("%s escaped!\n", arg[0])
+	}
+	return nil
+}
+
+func commandInspect(cfg *pokeapi.Config, arg []string) error {
+	// in case no pokemons specified for inspection
+	if len(arg) == 0 {
+		fmt.Println("No pokemon specified for inspection.")
+		fmt.Println("Command should be in format 'inspect pokemon-name'")
+		return nil
+	}
+	pokemonInfo, success := pokedex[arg[0]]
+	if !success {
+		fmt.Println("you have not yet caught that pokemon")
+		return nil
+	} else {
+		printInfo(pokemonInfo)
+	}
+
+	return nil
+}
+
+func printInfo(pokemonInfo pokeapi.PokemonInfo) {
+	fmt.Printf("Name: %s\n", pokemonInfo.Name)
+	fmt.Printf("Height: %d\n", pokemonInfo.Height)
+	fmt.Printf("Weight: %d\n", pokemonInfo.Weight)
+	fmt.Println("Stats:")
+	for _, stat := range pokemonInfo.Stats {
+		fmt.Printf("  -%s: %d\n", stat.Stat.Name, stat.Base_Stat)
+	}
+
+	fmt.Println("Types:")
+
+	for _, ptype := range pokemonInfo.Types {
+		fmt.Printf("  - %s\n", ptype.Type.Name)
+	}
+}
+
+func commandPokedex(cfg *pokeapi.Config, arg []string) error {
+	fmt.Println("Your Pokedex:")
+	for k := range pokedex {
+		fmt.Printf(" - %s\n", k)
+	}
+	return nil
 }
